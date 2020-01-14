@@ -13,7 +13,6 @@ import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.os.Bundle;
 
@@ -21,7 +20,6 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 
 import android.os.Handler;
 import android.os.IBinder;
@@ -138,7 +136,7 @@ public class MainActivity extends Activity {
 
                 @Override
                 public void onLeScan(final BluetoothDevice device, int rssi, byte[] scanRecord) {
-                    Boolean isDeviceFound = false;
+                    boolean isDeviceFound = false;
                     if(device != null){
                         final String deviceName = device.getName();
                         if (deviceName != null && deviceName.length() > 0) {
@@ -189,7 +187,7 @@ public class MainActivity extends Activity {
                 finish();
             }
 
-            Boolean result = mBluetoothLeService.connect(mDeviceAddress);
+            boolean result = mBluetoothLeService.connect(mDeviceAddress);
             Log.d(TAG, "Connect request result=" + result);
             mConnected = true;
             if(mScanning) {
@@ -245,7 +243,6 @@ public class MainActivity extends Activity {
         @Override
         public void onCharacteristicReadRequest(BluetoothDevice device, int requestId, int offset,
                                                 BluetoothGattCharacteristic characteristic) {
-            long now = System.currentTimeMillis();
             if (RemoteLedProfile.REMOTE_LED_DATA.equals(characteristic.getUuid())) {
                 Log.i(TAG, "Read data");
                 BluetoothHelper.getBluetoothGattServer().sendResponse(device,
