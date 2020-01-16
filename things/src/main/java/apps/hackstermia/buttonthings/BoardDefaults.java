@@ -2,12 +2,12 @@ package apps.hackstermia.buttonthings;
 
 import android.os.Build;
 
-import com.google.android.things.pio.PeripheralManagerService;
+import com.google.android.things.pio.PeripheralManager;
 
 import java.util.List;
 
 
-public class BoardDefaults {
+class BoardDefaults {
     private static final String DEVICE_EDISON_ARDUINO = "edison_arduino";
     private static final String DEVICE_EDISON = "edison";
     private static final String DEVICE_JOULE = "joule";
@@ -22,7 +22,7 @@ public class BoardDefaults {
      * For example, on Intel Edison Arduino breakout, pin "IO13" is connected to an onboard LED
      * that turns on when the GPIO pin is HIGH, and off when low.
      */
-    public static String getGPIOForLED() {
+    static String getGPIOForLED() {
         switch (getBoardVariant()) {
             case DEVICE_EDISON_ARDUINO:
                 return "IO13";
@@ -46,7 +46,7 @@ public class BoardDefaults {
     /**
      * Return the GPIO pin that the Button is connected on.
      */
-    public static String getGPIOForButton() {
+    static String getGPIOForButton() {
         switch (getBoardVariant()) {
             case DEVICE_EDISON_ARDUINO:
                 return "IO12";
@@ -75,7 +75,7 @@ public class BoardDefaults {
         // For the edison check the pin prefix
         // to always return Edison Breakout pin name when applicable.
         if (sBoardVariant.equals(DEVICE_EDISON)) {
-            PeripheralManagerService pioService = new PeripheralManagerService();
+            PeripheralManager pioService = PeripheralManager.getInstance();
             List<String> gpioList = pioService.getGpioList();
             if (gpioList.size() != 0) {
                 String pin = gpioList.get(0);

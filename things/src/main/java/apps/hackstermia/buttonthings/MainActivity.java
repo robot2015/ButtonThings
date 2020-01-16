@@ -25,7 +25,7 @@ import android.view.KeyEvent;
 import com.google.android.things.contrib.driver.button.Button;
 import com.google.android.things.contrib.driver.button.ButtonInputDriver;
 import com.google.android.things.pio.Gpio;
-import com.google.android.things.pio.PeripheralManagerService;
+import com.google.android.things.pio.PeripheralManager;
 
 public class MainActivity extends Activity {
     private static final String TAG = MainActivity.class.getSimpleName();
@@ -38,10 +38,10 @@ public class MainActivity extends Activity {
     /* Remote LED Data Characteristic */
     public static UUID REMOTE_LED_DATA = UUID.fromString("00002a2b-0000-1000-8000-00805f9b34fb");
 
-    private static final String ANDROID_DEVICE_NAME = "Pixel 2";
+    private static final String ANDROID_DEVICE_NAME = "SAMSUNG-rbeckman-8";
     private static final String ADAPTER_FRIENDLY_NAME = "My Android Things device";
     private static final int REQUEST_ENABLE_BT = 1;
-    // Stops scanning after 10 seconds.
+    // Stops scanning after 60 seconds.
     private static final long SCAN_PERIOD = 10000;
 
     private BluetoothAdapter mBluetoothAdapter;
@@ -57,12 +57,13 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Log.i(TAG, "Starting ButtonActivity");
+        Log.i(TAG, "Create ButtonThings");
 
-        PeripheralManagerService pioService = new PeripheralManagerService();
+        PeripheralManager pioService = PeripheralManager.getInstance();
         try {
             Log.i(TAG, "Configuring GPIO pins");
             mLedGpio = pioService.openGpio(BoardDefaults.getGPIOForLED());
+            Log.i(TAG, "mLedGpio = " + mLedGpio.toString());
             mLedGpio.setDirection(Gpio.DIRECTION_OUT_INITIALLY_LOW);
 
             Log.i(TAG, "Registering button driver");
@@ -105,11 +106,15 @@ public class MainActivity extends Activity {
             @Override
             public void run() {
                 mScanning = false;
+                // mBluetoothAdapter.getBluetoothLeScanner().startScan(mLeScanCallback);
+                Log.v(TAG, "Stop BLE scan");
                 mBluetoothAdapter.stopLeScan(mLeScanCallback);
+                Log.v(TAG, "Stop BLE scan, now what?");
             }
         }, SCAN_PERIOD);
 
         mScanning = true;
+        Log.v(TAG, "Start BLE scan");
         mBluetoothAdapter.startLeScan(mLeScanCallback);
     }
 
@@ -118,28 +123,37 @@ public class MainActivity extends Activity {
 
                 @Override
                 public void onLeScan(final BluetoothDevice device, int rssi, byte[] scanRecord) {
-                    Boolean isDeviceFound = false;
-                    if(device != null){
+                    Log.v(TAG, "Scanning...");
+                    Log.v(TAG, "Device = " + device.toString());
+                    boolean isDeviceFound = false;
+                    if (device != null) {
                         final String deviceName = device.getName();
                         if (deviceName != null && deviceName.length() > 0) {
-                            //Log.d(TAG, deviceName);
-                            if(deviceName.equals(ANDROID_DEVICE_NAME)){
+                            Log.v(TAG, "deviceName = " + deviceName);
+                            Log.v(TAG, "ANDROID_DEVICE_NAME = " + ANDROID_DEVICE_NAME);
+                            Log.v(TAG, "deviceName == ANDROID_DEVICE_NAME : " + deviceName.equals(ANDROID_DEVICE_NAME));
+                            if (deviceName.equals(ANDROID_DEVICE_NAME)) {
                                 isDeviceFound = true;
                                 mDeviceAddress = device.getAddress();
+                                Log.v(TAG, "Device found");
+                                Log.v(TAG, "mDeviceAddress = " + mDeviceAddress);
                             }
                         }
                     }
 
-                    if(isDeviceFound && !mConnected){
+                    Log.i(TAG, "Device found = " + isDeviceFound);
+                    if (isDeviceFound && !mConnected) {
                         Intent gattServiceIntent = new Intent(MainActivity.this, BluetoothLeService.class);
                         bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
                         mConnected = true;
+                        Log.i(TAG, "Device connected = " + mConnected);
                     }
                 }
             };
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        Log.v(TAG, "Request enable BLE");
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQUEST_ENABLE_BT) {
             Log.d(TAG, "Enable discoverable returned with result " + resultCode);
@@ -161,16 +175,17 @@ public class MainActivity extends Activity {
 
         @Override
         public void onServiceConnected(ComponentName componentName, IBinder service) {
+            Log.v(TAG, "Start initialize BLE");
             mBluetoothLeService = ((BluetoothLeService.LocalBinder) service).getService();
             if (!mBluetoothLeService.initialize()) {
                 Log.e(TAG, "Unable to initialize Bluetooth");
                 finish();
             }
 
-            Boolean result = mBluetoothLeService.connect(mDeviceAddress);
-            Log.d(TAG, "Connect request result=" + result);
+            boolean result = mBluetoothLeService.connect(mDeviceAddress);
+            Log.v(TAG, "Connect request result = " + result);
             mConnected = true;
-            if(mScanning) {
+            if (mScanning) {
                 mScanning = false;
                 mBluetoothAdapter.stopLeScan(mLeScanCallback);
             }
@@ -178,6 +193,7 @@ public class MainActivity extends Activity {
 
         @Override
         public void onServiceDisconnected(ComponentName componentName) {
+            Log.i(TAG, "BLE service disconnected");
             mBluetoothLeService = null;
         }
     };
@@ -191,6 +207,7 @@ public class MainActivity extends Activity {
     private final BroadcastReceiver mGattUpdateReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
+            Log.v(TAG, "Set up mGattUpdateReceiver");
             final String action = intent.getAction();
             if (BluetoothLeService.ACTION_GATT_CONNECTED.equals(action)) {
                 mConnected = true;
@@ -201,9 +218,9 @@ public class MainActivity extends Activity {
             } else if (BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED.equals(action)) {
                 // Show all the supported services and characteristics on the user interface.
                 List<BluetoothGattService> services = mBluetoothLeService.getSupportedGattServices();
-                if(services != null){
+                if (services != null) {
                     for (BluetoothGattService gattService : services) {
-                        if(gattService.getUuid().equals(REMOTE_LED_SERVICE)){
+                        if (gattService.getUuid().equals(REMOTE_LED_SERVICE)) {
                             final BluetoothGattCharacteristic characteristic = gattService.getCharacteristic(REMOTE_LED_DATA);
                             if (characteristic != null) {
                                 final int charaProp = characteristic.getProperties();
@@ -228,9 +245,9 @@ public class MainActivity extends Activity {
                 }
             } else if (BluetoothLeService.ACTION_DATA_AVAILABLE.equals(action)) {
                 String data = intent.getStringExtra(BluetoothLeService.EXTRA_DATA);
-                if(data.contains("false")){
+                if (data.contains("false")) {
                     setLedValue(false);
-                }else if(data.contains("true")){
+                } else if (data.contains("true")) {
                     setLedValue(true);
                 }
             }
@@ -248,6 +265,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onStart() {
+        Log.v(TAG, "Start ButtonThings");
         super.onStart();
         mButtonInputDriver.register();
         registerReceiver(mGattUpdateReceiver, makeGattUpdateIntentFilter());
@@ -258,6 +276,7 @@ public class MainActivity extends Activity {
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_SPACE) {
             // Turn on the LED
+            Log.v(TAG, "Turn on LED");
             setLedValue(true);
             return true;
         }
@@ -268,6 +287,7 @@ public class MainActivity extends Activity {
     public boolean onKeyUp(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_SPACE) {
             // Turn off the LED
+            Log.v(TAG, "Turn off LED");
             setLedValue(false);
             return true;
         }
@@ -287,13 +307,15 @@ public class MainActivity extends Activity {
     }
 
     @Override
-    protected void onPause(){
+    protected void onPause() {
+        Log.v(TAG, "Pause ButtonThings");
         super.onPause();
         unregisterReceiver(mGattUpdateReceiver);
     }
 
     @Override
-    protected void onDestroy(){
+    protected void onDestroy() {
+        Log.v(TAG, "Destroy ButtonThings");
         super.onDestroy();
 
         if (mButtonInputDriver != null) {
@@ -302,7 +324,7 @@ public class MainActivity extends Activity {
                 mButtonInputDriver.close();
             } catch (IOException e) {
                 Log.e(TAG, "Error closing Button driver", e);
-            } finally{
+            } finally {
                 mButtonInputDriver = null;
             }
         }
@@ -312,7 +334,7 @@ public class MainActivity extends Activity {
                 mLedGpio.close();
             } catch (IOException e) {
                 Log.e(TAG, "Error closing LED GPIO", e);
-            } finally{
+            } finally {
                 mLedGpio = null;
             }
             mLedGpio = null;
